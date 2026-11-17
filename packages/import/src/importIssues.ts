@@ -2,12 +2,12 @@
 import { LinearClient } from "@linear/sdk";
 import chalk from "chalk";
 import { Presets, SingleBar } from "cli-progress";
-import { format } from "date-fns";
 import inquirer from "inquirer";
 import uniq from "lodash/uniq.js";
 import ora from "ora";
 import { handleLabels } from "./helpers/labelManager.ts";
 import type { Comment, Importer, ImportResult } from "./types.ts";
+import { formatDueDate } from "./utils/formatDueDate.ts";
 import { replaceImagesInMarkdown } from "./utils/replaceImages.ts";
 
 type Id = string;
@@ -349,7 +349,7 @@ export const importIssues = async (
       assigneeId = importAnswers.targetAssignee || undefined;
     }
 
-    const formattedDueDate = issue.dueDate ? format(issue.dueDate, "yyyy-MM-dd") : undefined;
+    const formattedDueDate = issue.dueDate ? formatDueDate(issue.dueDate) : undefined;
 
     try {
       const createdIssue = await createIssueWithRetries(client, {
