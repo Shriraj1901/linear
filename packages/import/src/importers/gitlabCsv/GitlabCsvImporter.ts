@@ -2,7 +2,8 @@ import csv from "csvtojson";
 import type { Importer, ImportResult, IssuePriority } from "../../types.ts";
 import { safeParseInt } from "../../utils/parseInt.ts";
 
-type GitLabStatus = "opened" | "closed";
+// GitLab's CSV export writes "Open" or "Closed" in the State column
+type GitLabStatus = "Open" | "Closed";
 
 interface GitLabIssueType {
   Title: string;
@@ -52,13 +53,14 @@ export class GitLabCsvImporter implements Importer {
       const labels = row.Labels.split(",").filter(tag => !!tag);
       const weight = safeParseInt(row.Weight);
       const timeEstimateSeconds = safeParseInt(row["Time Estimate"]);
+      const closed = row.State?.toLowerCase() === "closed";
 
       importData.issues.push({
         title: row.Title,
         description: `${row.Description}\n\n[Original issue](${row.URL})`,
-        status: row.State === "closed" ? "Completed" : "Backlog",
-        createdAt: !!row["Created At (UTC)"] ? new Date(row["Created At (UTC)"]) : undefined,
-        completedAt: row.State === "closed" && !!row["Closed At (UTC)"] ? new Date(row["Closed At (UTC)"]) : undefined,
+        status: closed ? "Completed" : "Backlog",
+        createdAt: !!row["Created At (UTC)"] ? parseUtcDate(row["Created At (UTC)"]) : undefined,
+        completedAt: closed && !!row["Closed At (UTC)"] ? parseUtcDate(row["Closed At (UTC)"]) : undefined,
         labels,
         priority: !!weight ? normalizedWeights.get(weight) : undefined,
         dueDate: !!row["Due Date"] ? new Date(row["Due Date"]) : undefined,
@@ -81,6 +83,10 @@ export class GitLabCsvImporter implements Importer {
 
   private filePath: string;
 }
+
+// GitLab writes its "(UTC)" columns as "YYYY-MM-DD HH:MM:SS" without a zone, which `new Date` would read as local time
+const parseUtcDate = (value: string): Date =>
+  new Date(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(value) ? `${value.replace(" ", "T")}Z` : value);
 
 // Map weights to a normalized range of 1-4, with 1 (Urgent) being the highest weight. 0 is reserved for "No priority".
 const normalizeWeights = (weights: Set<number>) => {
